@@ -7,8 +7,14 @@ pub fn main() !void {
     const allocator = gpa.allocator();
     // const maybe_pid = celeste_memory_reader.mem.searchProcess("Celeste.bin.x86_64");
 
-    const celeste = celeste_memory_reader.findCeleste(allocator);
-    defer if (celeste) |handle| {
-        celeste_memory_reader.mem.freeProcess(allocator, handle);
+    const maybe_celeste = try celeste_memory_reader.findCeleste(allocator);
+    defer if (maybe_celeste) |celeste| {
+        celeste_memory_reader.mem.freeProcess(allocator, celeste);
     };
+
+    if (maybe_celeste == null) {
+        std.debug.print("Celeste not found\n", .{});
+        return;
+    }
+    // const celeste = maybe_celeste;
 }

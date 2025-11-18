@@ -29,7 +29,7 @@ pub fn openProcess(allocator: std.mem.Allocator, pid: pid_t) !*ProcessHandle {
 }
 
 pub const ReadError = error{ ReadTooSmall, FailedToRead };
-pub fn read(handle: *ProcessHandle, comptime T: type, address: u64) T {
+pub fn read(handle: *ProcessHandle, comptime T: type, address: u64) !T {
     return Impl.read(handle, T, address);
 }
 pub fn freeProcess(allocator: std.mem.Allocator, handle: *ProcessHandle) void {

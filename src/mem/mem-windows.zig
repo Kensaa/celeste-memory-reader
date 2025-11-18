@@ -86,7 +86,7 @@ pub fn read(handle: *ProcessHandle, comptime T: type, address: u64) !T {
     var count: usize = undefined;
     const success = ReadProcessMemory(handle.handle, @ptrFromInt(address), &res, @sizeOf(T), &count);
 
-    if (!success) return root.ReadError.FailedToRead;
+    if (success == 0) return root.ReadError.FailedToRead;
     if (count != @sizeOf(T)) return root.ReadError.ReadTooSmall;
 
     return res;

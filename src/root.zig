@@ -3,9 +3,10 @@ const std = @import("std");
 const builtin = @import("builtin");
 pub const mem = @import("mem/mem.zig");
 
+const print = std.debug.print;
 const Allocator = std.mem.Allocator;
 
-pub fn findCeleste(allocator: Allocator) ?*mem.ProcessHandle {
+pub fn findCeleste(allocator: Allocator) !?(*mem.ProcessHandle) {
     const celesteName = switch (builtin.os.tag) {
         .linux => "Celeste.bin.x86_64",
         .windows => "Celeste.exe",
@@ -16,7 +17,10 @@ pub fn findCeleste(allocator: Allocator) ?*mem.ProcessHandle {
     if (maybe_pid) |pid| {
         // Celeste process found
         // TODO: better check
-        const handle = mem.openProcess(allocator, pid) catch null;
+        const handle = try mem.openProcess(allocator, pid);
+
+        const monoRootDomain = try mem.read(handle, u64, 0xA17650);
+        print("root domain 0x{x}\n", .{monoRootDomain});
         return handle;
     } else {
         // Celeste not found
