@@ -42,7 +42,7 @@ pub fn read(handle: *ProcessHandle, comptime T: type, address: u64) !T {
     try file.seekTo(address);
 
     var res: T = undefined;
-    const count = try file.read(&res);
+    const count = try file.read(std.mem.asBytes(&res));
     if (count != @sizeOf(T)) {
         return root.ReadError.ReadTooSmall;
     }
