@@ -3,8 +3,6 @@ const root = @import("mem.zig");
 const ProcessHandle = root.ProcessHandle;
 const pid_t = root.pid_t;
 
-const LinuxProcessHandle = struct { file: std.fs.File };
-
 const max_path_bytes = std.fs.max_path_bytes;
 pub fn searchProcess(target: []const u8) ?pid_t {
     var procDir = std.fs.openDirAbsolute("/proc", .{ .iterate = true }) catch return null;
@@ -32,15 +30,14 @@ pub fn openProcess(allocator: std.mem.Allocator, pid: pid_t) !*ProcessHandle {
     const path = try std.fmt.bufPrintZ(&pathbuf, "/proc/{d}/mem", .{pid});
     const file = try std.fs.openFileAbsoluteZ(path, .{ .mode = .read_only });
 
-    var handle = try allocator.create(LinuxProcessHandle);
+    var handle = try allocator.create(ProcessHandle);
     handle.file = file;
 
-    return @ptrCast(handle);
+    return handle;
 }
 
 pub fn read(handle: *ProcessHandle, comptime T: type, address: u64) !T {
-    const linuxHandle: LinuxProcessHandle = @ptrCast(handle);
-    var file = linuxHandle.file;
+    var file = handle.file;
 
     try file.seekTo(address);
 
@@ -53,8 +50,7 @@ pub fn read(handle: *ProcessHandle, comptime T: type, address: u64) !T {
 }
 
 pub fn freeProcess(allocator: std.mem.Allocator, handle: *ProcessHandle) void {
-    const linuxHandle: LinuxProcessHandle = @ptrCast(handle);
-    var file = linuxHandle.file;
+    var file = handle.file;
     file.close();
-    allocator.destroy(linuxHandle);
+    allocator.destroy(handle);
 }

@@ -5,34 +5,94 @@ const pid_t = root.pid_t;
 
 const windows = std.os.windows;
 
-pub extern "kernel32" fn OpenProcess(dwDesiredAccess: windows.DWORD, bInheritHandle: windows.BOOL, dwProcessId: windows.DWORD) callconv(.winapi) windows.HANDLE;
+pub extern "kernel32" fn OpenProcess(dwDesiredAccess: windows.DWORD, bInheritHandle: windows.BOOL, dwProcessId: windows.DWORD) callconv(.winapi) ?windows.HANDLE;
 pub extern "kernel32" fn EnumProcesses(lpidProcess: *windows.DWORD, cb: windows.DWORD, lpcbNeeded: *windows.DWORD) callconv(.winapi) windows.BOOL;
+pub extern "psapi" fn GetModuleBaseNameA(
+    hProcess: windows.HANDLE,
+    hModule: ?windows.HMODULE,
+    lpBaseName: [*]u8,
+    nSize: windows.DWORD,
+) callconv(.winapi) windows.DWORD;
+pub extern "kernel32" fn ReadProcessMemory(
+    hProcess: windows.HANDLE,
+    lpBaseAddress: windows.LPCVOID,
+    lpBuffer: windows.LPVOID,
+    nSize: windows.SIZE_T,
+    lpNumberOfBytesRead: ?*windows.SIZE_T,
+) callconv(.winapi) windows.BOOL;
 
 const PROCESS_QUERY_INFORMATION = 0x0400;
 const PROCESS_VM_READ = 0x0010;
 
-const WindowsProcessHandle = struct {};
-pub fn searchProcess(_: []const u8) ?pid_t {
-    // var processes: [1024]windows.DWORD = undefined;
+pub fn searchProcess(target: []const u8) ?pid_t {
+    var process_ids: [1024]windows.DWORD = undefined;
+    var needed: windows.DWORD = 0;
 
-    // EnumProcesses(&processes, 0, 0);
+    if (EnumProcesses(
+        &process_ids[0],
+        @sizeOf(@TypeOf(process_ids)),
+        &needed,
+    ) == 0)
+        return null;
 
-    // const res = OpenProcess(PROCESS_QUERY_INFORMATION |
-    //     PROCESS_VM_READ, windows.FALSE, 0);
+    const count: usize = @intCast(needed / @sizeOf(windows.DWORD));
 
-    // std.debug.print("aaa : {}\n", .{res});
-    // return 1;
-    unreachable;
+    for (process_ids[0..count]) |pid| {
+        if (pid == 0) continue;
+
+        if (OpenProcess(
+            PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            windows.FALSE,
+            pid,
+        )) |handle| {
+            if (handle == windows.INVALID_HANDLE_VALUE) continue;
+
+            var name_buf: [260]u8 = undefined;
+            const name_len = GetModuleBaseNameA(handle, @ptrFromInt(0), &name_buf, name_buf.len);
+
+            if (name_len > 0) {
+                const name = name_buf[0..name_len];
+                // std.debug.print("name: {s}\n", .{name});
+                if (std.mem.indexOf(u8, name, target)) |_| {
+                    return pid;
+                }
+            }
+
+            windows.CloseHandle(handle);
+        }
+    }
+
+    return null;
 }
 
-pub fn openProcess(_: std.mem.Allocator, _: pid_t) !*ProcessHandle {
-    unreachable;
+const OpenError = error{InvalidHandle};
+pub fn openProcess(allocator: std.mem.Allocator, pid: pid_t) !*ProcessHandle {
+    const maybe_handle = OpenProcess(PROCESS_VM_READ, windows.FALSE, pid);
+    if (maybe_handle) |handle| {
+        if (handle == windows.INVALID_HANDLE_VALUE) {
+            return OpenError.InvalidHandle;
+        }
+
+        var processHandle = try allocator.create(ProcessHandle);
+        processHandle.handle = handle;
+        return processHandle;
+    }
+
+    return OpenError.InvalidHandle;
 }
 
-pub fn read(_: *ProcessHandle, comptime T: type, _: u64) !T {
-    unreachable;
+pub fn read(handle: *ProcessHandle, comptime T: type, address: u64) !T {
+    var res: T = undefined;
+    var count: usize = undefined;
+    const success = ReadProcessMemory(handle.handle, @ptrFromInt(address), &res, @sizeOf(T), &count);
+
+    if (!success) return root.ReadError.FailedToRead;
+    if (count != @sizeOf(T)) return root.ReadError.ReadTooSmall;
+
+    return res;
 }
 
-pub fn freeProcess(_: std.mem.Allocator, _: *ProcessHandle) void {
-    unreachable;
+pub fn freeProcess(allocator: std.mem.Allocator, handle: *ProcessHandle) void {
+    windows.CloseHandle(handle.handle);
+    allocator.destroy(handle);
 }
