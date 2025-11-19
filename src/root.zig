@@ -18,9 +18,10 @@ pub fn findCeleste(allocator: Allocator) !?(*mem.ProcessHandle) {
         // Celeste process found
         // TODO: better check
         const handle = try mem.openProcess(allocator, pid);
+        _ = try mem.findMonoRootDomain(allocator, handle);
 
-        const monoRootDomain = try mem.read(handle, u64, 0xA17650);
-        print("root domain 0x{x}\n", .{monoRootDomain});
+        // const monoRootDomain = try mem.read(handle, u64, 0xA17650);
+        // print("root domain 0x{x}\n", .{monoRootDomain});
         return handle;
     } else {
         // Celeste not found

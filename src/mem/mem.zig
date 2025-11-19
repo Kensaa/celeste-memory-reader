@@ -35,3 +35,7 @@ pub fn read(handle: *ProcessHandle, comptime T: type, address: u64) !T {
 pub fn freeProcess(allocator: std.mem.Allocator, handle: *ProcessHandle) void {
     return Impl.freeProcess(allocator, handle);
 }
+
+pub fn findMonoRootDomain(allocator: std.mem.Allocator, handle: *ProcessHandle) !u64 {
+    return Impl.findMonoRootDomain(allocator, handle);
+}
