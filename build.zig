@@ -40,6 +40,36 @@ pub fn build(b: *std.Build) void {
         // which requires us to specify a target.
         .target = target,
     });
+    if (target.result.os.tag == .windows) {
+        if (target.result.cpu.arch != .x86) {
+            // @panic("This project must be built as 32-bit because on the windows version of Celeste is a 32-bit executable (x86)");
+        }
+        mod.addCSourceFiles(.{
+            .root = b.path("src/windows/dotnet_reflection/"),
+            .files = &.{"dotnet_reflection.cpp"},
+            .flags = &[_][]const u8{"-std=c++20"},
+        });
+        mod.link_libc = true;
+        mod.link_libcpp = true;
+        mod.addIncludePath(b.path("src/windows/dotnet_reflection/"));
+
+        const env = b.graph.env_map;
+        const netfxsdk_dir = env.get("NETFXSDKDir") orelse {
+            @panic("NETFXSDKDir not set.\n" ++
+                "Install the .NET Framework SDK (4.8) or run from a VS Developer Prompt.");
+        };
+
+        mod.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ netfxsdk_dir, "Include", "um" }) });
+        const arch_string = switch (target.result.cpu.arch) {
+            .x86 => "x86",
+            .x86_64 => "x64",
+            else => @panic("unsupported arch"),
+        };
+        mod.addLibraryPath(.{
+            .cwd_relative = b.pathJoin(&.{ netfxsdk_dir, "Lib", "um", arch_string }),
+        });
+        mod.linkSystemLibrary("corguids", .{ .preferred_link_mode = .static }); // For ICorDebug GUIDs
+    }
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
