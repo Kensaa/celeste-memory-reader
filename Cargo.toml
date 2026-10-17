@@ -1,0 +1,20 @@
+[package]
+name = "celeste-memory-reader"
+version = "1.0.0"
+edition = "2024"
+
+[lib]
+name="celeste_memory_reader"
+path = "src/lib.rs"
+
+[dependencies]
+windows = { version = "0.62", features = [
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Threading",
+] }
+
+[build-dependencies]
+bindgen = { version = "0.72.1" }
+cc = { version = "1.4.4" }
+dunce = { version = "1.0.5" }
+
